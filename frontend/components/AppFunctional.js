@@ -1,77 +1,150 @@
-import React from 'react'
+import React, { useState } from 'react'
+import axios from "axios";
 
-// Suggested initial states
-const initialMessage = ''
-const initialEmail = ''
-const initialSteps = 0
-const initialIndex = 4 // the index the "B" is at
 
+const positionMap = {
+    "0": {x: 1, y: 1},
+    "1": {x: 2, y: 1},
+    "2": {x: 3, y: 1},
+    "3": {x: 1, y: 2},
+    "4": {x: 2, y: 2},
+    "5": {x: 3, y: 2},
+    "6": {x: 1, y: 3},
+    "7": {x: 2, y: 3},
+    "8": {x: 3, y: 3},
+}
+
+function plurify(count, word){
+    return count === 1 ? word :`${word}s`;
+}
 export default function AppFunctional(props) {
   // THE FOLLOWING HELPERS ARE JUST RECOMMENDATIONS.
   // You can delete them and build your own logic from scratch.
+    const [stepCount, setStepCount] = useState(0);
+    const [positionX, setPositionX] = useState(2);
+    const [positionY, setPositionY] = useState(2);
+    const [message, setMessage] = useState("");
+    const [email, setEmail] = useState("");
 
-  function getXY() {
-    // It it not necessary to have a state to track the coordinates.
-    // It's enough to know what index the "B" is at, to be able to calculate them.
+
+  // Resets pack to origin (2, 2)
+    function reset() {
+        setStepCount(0);
+        setPositionX(2);
+        setPositionY(2);
+        setMessage("");
+        setEmail("");
+    }
+
+    function trackMove(){
+        setStepCount(step => step + 1);
+        setMessage("");
+    }
+
+    function moveUp(){
+      // "Y" can only be "reduced" (go up) if it is greater than 1
+        if(positionY > 1){
+            setPositionY(y=> y-1);
+            trackMove();
+      }else {
+            setMessage("You can't go up");
+      }
+    }
+
+  function moveDown(){
+      // "Y" can only be "increased" (go down) if it is less than 3
+      if(positionY < 3){
+          setPositionY(y=> y+1);
+          trackMove();
+      }else {
+            setMessage("You can't go down");
+      }
   }
 
-  function getXYMessage() {
-    // It it not necessary to have a state to track the "Coordinates (2, 2)" message for the user.
-    // You can use the `getXY` helper above to obtain the coordinates, and then `getXYMessage`
-    // returns the fully constructed string.
+  function moveRight(){
+      // "X" can only be "increased" (go right) if it is less than 1
+      if(positionX < 3){
+          setPositionX(x=> x+1);
+          trackMove();
+      }else{
+            setMessage("You can't go right");
+      }
   }
 
-  function reset() {
-    // Use this helper to reset all states to their initial values.
+  function moveLeft(){
+      // "X" can only be "reduced" (go left) if it is greater than 1
+      if(positionX > 1){
+          setPositionX(x=> x-1);
+          trackMove();
+      }else{
+            setMessage("You can't go left");
+      }
   }
 
-  function getNextIndex(direction) {
-    // This helper takes a direction ("left", "up", etc) and calculates what the next index
-    // of the "B" would be. If the move is impossible because we are at the edge of the grid,
-    // this helper should return the current index unchanged.
+  function isSelected(index) {
+        const { x, y } = positionMap[`${index}`];
+      return x === positionX && y === positionY;
   }
 
-  function move(evt) {
-    // This event handler can use the helper above to obtain a new index for the "B",
-    // and change any states accordingly.
-  }
-
-  function onChange(evt) {
-    // You will need this to update the value of the input.
-  }
 
   function onSubmit(evt) {
-    // Use a POST request to send a payload to the server.
+    evt.preventDefault();
+    const payload = {
+        "x": positionX,
+        "y": positionY,
+        "steps": stepCount,
+        email
+    };
+    axios.post('http://localhost:9000/api/result', payload)
+        .then((response) => {
+        setMessage(response.data.message);
+        setEmail("");
+    }).catch((error) => {
+        if (error?.response?.data?.message) {
+            setMessage(error.response.data.message);
+        } else if(typeof error?.message === 'string'){
+            // Something happened in setting up the request that triggered an Error
+            setMessage(error.message);
+        }else{
+            setMessage("An error occurred");
+        }
+    });
   }
 
   return (
     <div id="wrapper" className={props.className}>
       <div className="info">
-        <h3 id="coordinates">Coordinates (2, 2)</h3>
-        <h3 id="steps">You moved 0 times</h3>
+        <h3 id="coordinates">Coordinates ({positionX}, {positionY})</h3>
+        <h3 id="steps">You moved {stepCount} {plurify(stepCount, 'time')}</h3>
       </div>
       <div id="grid">
-        {
-          [0, 1, 2, 3, 4, 5, 6, 7, 8].map(idx => (
-            <div key={idx} className={`square${idx === 4 ? ' active' : ''}`}>
-              {idx === 4 ? 'B' : null}
-            </div>
-          ))
-        }
+          {
+              [0, 1, 2, 3, 4, 5, 6, 7, 8].map(idx => (
+                  <div key={idx} className={`square${isSelected(idx) ? ' active' : ''}`}>
+                        {isSelected(idx) ? 'B' : null}
+                  </div>
+              ))
+          }
       </div>
       <div className="info">
-        <h3 id="message"></h3>
+        <h3 id="message">
+            {message}
+        </h3>
       </div>
       <div id="keypad">
-        <button id="left">LEFT</button>
-        <button id="up">UP</button>
-        <button id="right">RIGHT</button>
-        <button id="down">DOWN</button>
-        <button id="reset">reset</button>
+        <button id="left" onClick={moveLeft}>LEFT</button>
+        <button id="up" onClick={moveUp}>UP</button>
+        <button id="right" onClick={moveRight}>RIGHT</button>
+        <button id="down" onClick={moveDown}>DOWN</button>
+        <button id="reset" onClick={reset}>reset</button>
       </div>
       <form>
-        <input id="email" type="email" placeholder="type email"></input>
-        <input id="submit" type="submit"></input>
+        <input id="email" type="email" value={email}
+               onChange={(e)=>setEmail(e.target.value)}
+               placeholder="type email">
+
+        </input>
+        <input id="submit" type="submit" onClick={onSubmit}></input>
       </form>
     </div>
   )
